@@ -1,0 +1,16 @@
+# Keep the build context small — the image builds its own vendor/ and public/build.
+.git
+.github
+node_modules
+vendor
+var
+public/build
+public/bundles
+.env.local
+.env.*.local
+.env.snp
+docker-compose.override.yml
+*.md
+tests
+.idea
+.vscode

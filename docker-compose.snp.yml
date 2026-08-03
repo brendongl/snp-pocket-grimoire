@@ -1,0 +1,52 @@
+# Self-hosted deployment for Sip n Play.
+#
+# Deliberately a SEPARATE file from upstream's docker-compose.yml — that one provisions
+# only a Postgres box for local development, and leaving it untouched keeps
+# `git merge upstream/main` free of conflicts on the file most likely to change.
+#
+#   docker compose -f docker-compose.snp.yml --env-file .env.snp up -d --build
+#
+# The published port binds to the host, which on a LAN box behind NAT means it is
+# reachable at http://<box-lan-ip>:<PORT> and nowhere else. Do not put this behind a
+# public reverse proxy: the grimoire has no authentication of its own.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: snp-pocket-grimoire:latest
+    container_name: snp-pocket-grimoire
+    restart: unless-stopped
+    depends_on:
+      - database
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      # Override the committed dev default — .env ships a placeholder APP_SECRET.
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env.snp}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-grimoire}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.snp}@database:5432/${POSTGRES_DB:-grimoire}?serverVersion=16&charset=utf8"
+      # Flip to 1 once the reference data is imported, to speed up restarts.
+      PG_SKIP_IMPORT: ${PG_SKIP_IMPORT:-0}
+    ports:
+      - "${PORT:-8088}:80"
+
+  database:
+    image: postgres:16-alpine
+    container_name: snp-pocket-grimoire-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-grimoire}
+      POSTGRES_USER: ${POSTGRES_USER:-grimoire}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.snp}
+    volumes:
+      - grimoire-db:/var/lib/postgresql/data:rw
+    # No published port: only the app container needs to reach Postgres.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-grimoire} -d ${POSTGRES_DB:-grimoire}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  grimoire-db:

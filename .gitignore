@@ -21,3 +21,7 @@ assets/img/roles/
 npm-debug.log
 yarn-error.log
 ###< symfony/webpack-encore-bundle ###
+
+###> snp deployment ###
+/.env.snp
+###< snp deployment ###
