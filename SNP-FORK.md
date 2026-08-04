@@ -34,12 +34,67 @@ Conflict risk is concentrated in the files listed below. Nothing else upstream i
 | `.dockerignore` | new | Keeps the build context small. |
 | `SNP-FORK.md` | new | This file. |
 | `.gitignore` | edited | One appended block for `/.env.snp`. Minimal, unlikely to conflict. |
+| `src/Command/ImportCommand.php` | edited | One-line fix: `getTeam()` fell over with a fatal `TypeError` when called without a `name`, which the character importer always does. See below. |
 
 Upstream's `webpack.config.js` enables `postcss-loader` without committing a PostCSS
 config, and `postcss` is only present as an unmet peer dependency. That looks broken but
 is not — verified by building both with and without a `postcss.config.js`; the loader runs
 unconfigured either way and `yarn build` exits 0. No config file added, so the diff stays
 smaller.
+
+## Upstream problems we hit
+
+Worth knowing, because they are invisible until you try to deploy this yourself.
+
+**1. The migrations are MySQL; the config says Postgres.**
+`migrations/` is full of `AUTO_INCREMENT`, `utf8mb4` and `ENGINE = InnoDB`, but both `.env`
+and `docker-compose.yml` point at PostgreSQL. Following their config gets you
+`syntax error at or near "AUTO_INCREMENT"` and no schema at all. We run MySQL 8, which is
+what the migrations actually target, so future upstream migrations keep applying.
+
+**2. `public/.htaccess` force-redirects to `https://www.`**
+Correct for pocketgrimoire.co.uk, fatal for a plain-HTTP LAN box — every request 301s to
+an HTTPS host that is not listening. Patched at **build time** in the Dockerfile (with a
+`grep` guard that fails the build if the rule ever stops matching) so the file itself stays
+byte-identical to upstream and never conflicts on merge.
+
+**3. `pocket-grimoire:import` cannot bootstrap an empty database.**
+It is for *updating* an already-populated one. On an empty database it dies immediately:
+`getEdition()` has no create path and returns `null` into a non-nullable return type. Its
+`--type` and `--locale` options also appear not to filter — the progress bar reads 249
+regardless, which is the locale count, not the character count.
+
+The real bootstrap is the `populate-*` commands, one data file each, in dependency order —
+teams and editions before roles, because roles reference both. That is what the entrypoint
+runs.
+
+**4. `populate-jinxes` fails on upstream's own data.**
+`JinxRepository::getByTargetTrick()` gets a `null` target from `assets/data/jinx.json`. The
+entrypoint logs a warning and carries on, so the app still starts with a full character
+list; only the Jinxes panel is empty. Not yet fixed.
+
+**5. `getTeam()` fatals when the character importer calls it.**
+The character pass calls `getTeam(['id' => $data['team']])` with no `name` key, and
+`getTeam` then does `setName($data['name'])` — a fatal `TypeError` on any team that does not
+already exist. Our one-line fix falls back to the identifier. Not strictly needed now that
+we bootstrap with `populate-*`, but it turns a crash into a sensible default and is worth
+carrying (and reporting upstream).
+
+## Role icons are NOT in the repo
+
+`assets/img/roles/` is **gitignored** upstream — the artwork is The Pandemonium Institute's,
+used with permission on the official site and not redistributed. `pocket-grimoire:update-images`
+only writes a filename into the database; it downloads nothing.
+
+So a self-hosted instance serves **no character icons** until they are supplied by hand
+(`assets/img/roles/*.webp`, picked up by the Encore `copyFiles` rule into
+`public/build/img/roles/`). The app is fully usable without them — names and abilities all
+render — the tokens are just blank.
+
+> [!warning] This is a licensing decision, not a technical one
+> Sip n Play is a commercial venue. Copying TPI's artwork onto a cafe's own deployment is a
+> different question from a fan running it at home, and it should be answered deliberately
+> rather than by quietly downloading the files.
 
 ## Deploying
 

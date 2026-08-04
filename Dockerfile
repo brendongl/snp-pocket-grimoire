@@ -34,8 +34,14 @@ RUN yarn build
 # noisy-to-broken on newer PHP.
 FROM php:8.2-apache-bookworm AS runtime
 
-# intl is required by symfony/intl; pdo_pgsql by Doctrine against Postgres; zip is for
-# composer's dist installs; opcache is the single biggest production win.
+# intl is required by symfony/intl; zip is for composer's dist installs; opcache is the
+# single biggest production win.
+#
+# pdo_mysql is the one that matters: upstream's committed migrations are MySQL
+# (AUTO_INCREMENT, utf8mb4, ENGINE = InnoDB) even though their .env defaults
+# DATABASE_URL to postgresql, so the app cannot migrate against Postgres at all.
+# pdo_pgsql is installed anyway — it costs nothing and leaves the door open if upstream
+# ever regenerates them.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev \
         libpq-dev \
@@ -44,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         curl \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install -j"$(nproc)" intl pdo pdo_pgsql zip opcache \
+    && docker-php-ext-install -j"$(nproc)" intl pdo pdo_mysql pdo_pgsql zip opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN printf '%s\n' \
@@ -81,6 +87,16 @@ RUN composer install \
 
 COPY . .
 COPY --from=assets /app/public/build ./public/build
+
+# Upstream's public/.htaccess carries a "Canonical https/www" block that 301s every
+# plain-HTTP request to https://www.<host>. That is right for pocketgrimoire.co.uk and
+# fatal here: we serve plain HTTP on the shop LAN, so every request bounced to an
+# https://<box-ip>:8088 that nothing is listening on.
+#
+# Patched at BUILD time rather than in the repo, so public/.htaccess stays byte-identical
+# to upstream and `git merge upstream/main` never conflicts on it.
+RUN sed -i 's|^\(\s*RewriteRule (\.\*) https://.*\)$|# [snp] disabled for LAN HTTP: \1|' public/.htaccess \
+ && ! grep -qE '^\s*RewriteRule \(\.\*\) https://' public/.htaccess
 
 RUN composer dump-autoload --classmap-authoritative --no-dev \
  && mkdir -p var/cache var/log \

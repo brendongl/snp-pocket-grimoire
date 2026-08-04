@@ -49,21 +49,41 @@ php bin/console doctrine:migrations:migrate \
     --allow-no-migration
 
 # --- reference data ----------------------------------------------------------------
-# pocket-grimoire:import is the single entry point; it handles teams, then characters,
-# then jinxes, in that order (the order matters and the command enforces it).
+# The character list comes from the DATABASE, not the built assets, so a container that
+# skips this comes up looking fine and then offers no characters to pick.
 #
-# Set PG_SKIP_IMPORT=1 to skip on restart once the data is in — it is safe to re-run,
-# just slow, and it reaches out to the upstream script-tool data.
+# Use the populate-* commands, NOT pocket-grimoire:import. `import` is for updating an
+# already-populated database with translations: on an empty one it dies on the first
+# character, because getEdition() has no create path and returns null. The populate
+# commands each read one data file and are the actual bootstrap.
+#
+# Order matters — roles reference both teams and editions.
+#
+# Set PG_SKIP_IMPORT=1 to skip on restart once the data is in. Re-running is safe
+# (every command is find-or-create), just slow.
 if [ "${PG_SKIP_IMPORT:-0}" = "1" ]; then
-    log "PG_SKIP_IMPORT=1 — skipping reference data import"
+    log "PG_SKIP_IMPORT=1 — skipping reference data bootstrap"
 else
-    log "importing reference data (teams -> characters -> jinxes)..."
-    if ! php bin/console pocket-grimoire:import --no-interaction; then
-        # A failed import leaves a usable app with an empty character list, which is
-        # far better than a container that will not start at all.
-        log "WARNING: import failed — the app will start but characters may be missing."
-        log "         re-run manually: docker exec <container> php bin/console pocket-grimoire:import"
-    fi
+    log "populating reference data..."
+    populate() {
+        label="$1"; shift
+        if php bin/console "$@" --no-interaction >/dev/null 2>&1; then
+            log "  ok: ${label}"
+        else
+            # Never fatal. A missing jinx table is a worse outcome than no app at all,
+            # and every one of these is independently re-runnable by hand.
+            log "  WARNING: ${label} failed — re-run by hand if needed"
+        fi
+    }
+
+    populate "teams"     pocket-grimoire:populate-teams    --file=assets/data/teams.json
+    populate "editions"  pocket-grimoire:populate-editions --file=assets/data/editions.json
+    populate "roles"     pocket-grimoire:populate-roles    --file=assets/data/characters.json
+    populate "jinxes"    pocket-grimoire:populate-jinxes   --file=assets/data/jinx.json
+    populate "night order" pocket-grimoire:order-roles     --file=assets/data/night-order.json
+
+    roles="$(php bin/console dbal:run-sql 'SELECT COUNT(*) AS c FROM roles' --no-interaction 2>/dev/null | grep -oE '[0-9]+' | tail -1 || echo '?')"
+    log "reference data ready — ${roles} roles"
 fi
 
 chown -R www-data:www-data var || true

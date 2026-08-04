@@ -541,10 +541,22 @@ class ImportCommand extends Command
 
             if (is_null($team)) {
 
+                // [snp] Fall back to the identifier when no name is supplied.
+                //
+                // The character importer calls this as getTeam(['id' => $data['team']])
+                // (see the setTeam call further down), with no 'name' key at all. That
+                // only survives if the team already exists from the teams pass, and
+                // when it does not, setName(null) is a fatal TypeError that aborts the
+                // whole import — leaving the app with an empty character list.
+                //
+                // A team created this way gets its proper name the moment the teams
+                // pass runs, because that path does supply one.
+                $name = $data['name'] ?? ucfirst((string) $data['id']);
+
                 $team = new Team();
                 $team
                     ->setIdentifier($data['id'])
-                    ->setName($data['name'])
+                    ->setName($name)
                     ->setTranslatableLocale($locale);
                 $this->em->persist($team);
 

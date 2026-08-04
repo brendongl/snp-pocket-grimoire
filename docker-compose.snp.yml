@@ -6,6 +6,13 @@
 #
 #   docker compose -f docker-compose.snp.yml --env-file .env.snp up -d --build
 #
+# MySQL, not Postgres. Upstream's committed migrations are MySQL-flavoured
+# (AUTO_INCREMENT, utf8mb4, ENGINE = InnoDB) while their .env and their
+# docker-compose.yml both point at Postgres, so their own recipe cannot run their own
+# migrations — doctrine:migrations:migrate dies on `syntax error at or near
+# "AUTO_INCREMENT"`. Following the migrations is the lower-risk half of that
+# contradiction: future upstream migrations keep applying.
+#
 # The published port binds to the host, which on a LAN box behind NAT means it is
 # reachable at http://<box-lan-ip>:<PORT> and nowhere else. Do not put this behind a
 # public reverse proxy: the grimoire has no authentication of its own.
@@ -19,34 +26,40 @@ services:
     container_name: snp-pocket-grimoire
     restart: unless-stopped
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
       # Override the committed dev default — .env ships a placeholder APP_SECRET.
       APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env.snp}
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-grimoire}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.snp}@database:5432/${POSTGRES_DB:-grimoire}?serverVersion=16&charset=utf8"
+      DATABASE_URL: "mysql://${DB_USER:-grimoire}:${DB_PASSWORD:?set DB_PASSWORD in .env.snp}@database:3306/${DB_NAME:-grimoire}?serverVersion=8.0&charset=utf8mb4"
       # Flip to 1 once the reference data is imported, to speed up restarts.
       PG_SKIP_IMPORT: ${PG_SKIP_IMPORT:-0}
     ports:
       - "${PORT:-8088}:80"
 
   database:
-    image: postgres:16-alpine
+    image: mysql:8.0
     container_name: snp-pocket-grimoire-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-grimoire}
-      POSTGRES_USER: ${POSTGRES_USER:-grimoire}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.snp}
+      MYSQL_DATABASE: ${DB_NAME:-grimoire}
+      MYSQL_USER: ${DB_USER:-grimoire}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.snp}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env.snp}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     volumes:
-      - grimoire-db:/var/lib/postgresql/data:rw
-    # No published port: only the app container needs to reach Postgres.
+      - grimoire-db:/var/lib/mysql:rw
+    # No published port: only the app container needs to reach the database.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-grimoire} -d ${POSTGRES_DB:-grimoire}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 40s
 
 volumes:
   grimoire-db:
