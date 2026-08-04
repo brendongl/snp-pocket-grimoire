@@ -1,0 +1,53 @@
+{#
+    [snp] Report a finished game to the Sip n Play leaderboard.
+
+    The second half of why this fork exists. Upstream has no concept of a game ending —
+    it is purely a grimoire — so this section is entirely ours.
+
+    Deliberately in English rather than translated. The other strings here come from
+    upstream's own translation files, and adding keys that exist only in en_GB would
+    render as raw keys the moment a storyteller switched language. English in every
+    locale is the more predictable failure.
+#}
+{% embed 'includes/details.html.twig' with {
+    summary: 'End Game &amp; Report',
+    id: 'snp-report'
+} %}
+    {% block body %}
+    <div id="snp-report-body" data-configured="0">
+
+        <p class="text-small" id="snp-report-intro">
+            Send this game to the Sip n Play leaderboard. Everyone on the grimoire is
+            reported with the character they finished on.
+        </p>
+
+        <fieldset class="mb-4">
+            <legend class="text-small">Who won?</legend>
+            <p>
+                <label><input type="radio" name="snp-winner" value="good"> Good wins</label>
+                <label class="ml-2"><input type="radio" name="snp-winner" value="evil"> Evil wins</label>
+                <label class="ml-2"><input type="radio" name="snp-winner" value="none"> No result</label>
+            </p>
+        </fieldset>
+
+        <p class="text-small">
+            <label for="snp-report-date">Game night</label>
+            <input type="date" class="input" id="snp-report-date" name="snp-report-date">
+            <span class="d-block text-small">Defaults to tonight. Change it to record a night you are catching up on.</span>
+        </p>
+
+        {# Shows exactly what is about to be sent, so a wrong seat is caught before the
+           write rather than after it. #}
+        <div id="snp-report-preview" class="mb-4"></div>
+
+        <p>
+            <button type="button" class="button" id="snp-report-send" disabled>
+                Report game
+            </button>
+        </p>
+
+        <p id="snp-report-status" class="text-small" role="status" aria-live="polite"></p>
+
+    </div>
+    {% endblock %}
+{% endembed %}

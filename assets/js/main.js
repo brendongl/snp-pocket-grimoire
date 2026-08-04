@@ -24,6 +24,8 @@ import "./processes/info-tokens.js";
 
 import "./processes/notes.js";
 
+import "./processes/snp-report.js";
+
 import "./processes/acknowledgements.js";
 
 import "./processes/store.js";

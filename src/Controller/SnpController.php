@@ -122,4 +122,122 @@ class SnpController extends AbstractController
             ]);
         }
     }
+
+    /**
+     * POST /snp/report
+     *
+     * Send a finished game to the leaderboard.
+     *
+     * Body: { date?, winningTeam, notes?, players: [{ name, customerId?, characterId,
+     *         characterName, characterTeam }] }
+     *
+     * Unlike /snp/tonight this does NOT fail silently. A storyteller pressing "Report
+     * game" is asking for something to happen, and a green tick over a game that was
+     * never recorded is worse than an error — they would find out weeks later when the
+     * leaderboard was wrong.
+     *
+     * @Route("/snp/report", name="snp_report", methods={"POST"})
+     */
+    public function report(Request $request): JsonResponse
+    {
+        if (!$this->isConfigured()) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'The leaderboard bridge is not configured on this grimoire.',
+            ], 503);
+        }
+
+        $body = json_decode($request->getContent(), true);
+        if (!is_array($body)) {
+            return $this->json(['ok' => false, 'error' => 'Malformed request.'], 400);
+        }
+
+        $winningTeam = (string) ($body['winningTeam'] ?? '');
+        if (!in_array($winningTeam, ['good', 'evil', 'none'], true)) {
+            return $this->json(['ok' => false, 'error' => 'Pick who won first.'], 400);
+        }
+
+        $date = (string) ($body['date'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $date = $this->today();
+        }
+
+        $players = [];
+        foreach (($body['players'] ?? []) as $player) {
+            $characterName = trim((string) ($player['characterName'] ?? ''));
+            if ($characterName === '') {
+                continue;
+            }
+
+            $team = (string) ($player['characterTeam'] ?? '');
+            $customerId = $player['customerId'] ?? null;
+            $name = trim((string) ($player['name'] ?? ''));
+
+            $players[] = [
+                // An account player carries customerId and no name, so the leaderboard
+                // resolves their display name at read time and a later rename updates
+                // their history. A walk-in carries the typed name. Never both.
+                'customerId' => $customerId ?: null,
+                'playerName' => $customerId ? null : ($name !== '' ? $name : null),
+                'characterId' => $player['characterId'] ?? null,
+                'characterName' => $characterName,
+                'characterTeam' => $team !== '' ? $team : null,
+                // Pocket Grimoire has no separate alignment - it is implied by team.
+                'alignment' => in_array($team, ['minion', 'demon'], true) ? 'evil' : 'good',
+            ];
+        }
+
+        if (count($players) === 0) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'No characters on the grimoire to report.',
+            ], 400);
+        }
+
+        $payload = [
+            'date' => $date,
+            'winningTeam' => $winningTeam,
+            'players' => $players,
+        ];
+        if (!empty($body['scriptName'])) {
+            $payload['scriptName'] = (string) $body['scriptName'];
+        }
+        if (!empty($body['notes'])) {
+            $payload['notes'] = (string) $body['notes'];
+        }
+
+        try {
+            $response = $this->http->request('POST', $this->bridgeUrl . '/api/botc/bridge/games', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->bridgeKey,
+                    'Content-Type' => 'application/json',
+                ],
+                'body' => json_encode($payload),
+                'timeout' => 20,
+            ]);
+
+            $status = $response->getStatusCode();
+            $data = $response->toArray(false);
+
+            if ($status !== 200 || !($data['success'] ?? false)) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => $data['error'] ?? ('The website rejected the game (HTTP ' . $status . ').'),
+                ], 502);
+            }
+
+            return $this->json([
+                'ok' => true,
+                'date' => $date,
+                'playerCount' => count($players),
+                'gameId' => $data['game']['id'] ?? null,
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Could not reach the website. The game was NOT recorded.',
+            ], 502);
+        }
+    }
 }

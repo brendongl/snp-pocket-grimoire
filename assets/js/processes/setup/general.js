@@ -7,6 +7,9 @@ import TokenStore from "../../classes/TokenStore.js";
 import Dialog from "../../classes/Dialog.js";
 import Names from "../../classes/Names.js";
 import {
+    loadTonight
+} from "../../snp/tonight.js";
+import {
     fetchFromStore
 } from "../../utils/fetch.js";
 import {
@@ -52,38 +55,15 @@ Names.create()
 // Suggestions, not a restriction: the input stays free text so walk-ins still work,
 // which matters because plenty of players at the cafe never sign up online.
 //
-// Fetched through our own /snp/tonight rather than calling the website directly — the
-// bridge API key stays server-side, out of a page that gets handed around a table.
-// Failures are silent by design: an unreachable website should cost the storyteller a
-// convenience, never a game.
-(function loadTonightsPlayers() {
+// The list is shared with the end-of-game report (see snp/tonight.js), which needs the
+// same names to work out which players have accounts.
+loadTonight().then(({ players }) => {
 
     const names = Names.create();
 
-    // Defaults to tonight, in cafe local time, worked out server-side. ?date=YYYY-MM-DD
-    // overrides it — for running a night that is not today, and for testing on a date
-    // that actually has sign-ups.
-    const requested = new URLSearchParams(window.location.search).get("date");
-    const query = /^\d{4}-\d{2}-\d{2}$/.test(requested || "")
-        ? `?date=${requested}`
-        : "";
+    players.forEach(({ name }) => names.add(name));
 
-    fetch(`/snp/tonight${query}`, { headers: { Accept: "application/json" } })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((data) => {
-
-            if (!data || !Array.isArray(data.players)) {
-                return;
-            }
-
-            data.players.forEach(({ name }) => names.add(name));
-
-        })
-        .catch(() => {
-            // Offline, misconfigured, or the site is down. Nothing to do.
-        });
-
-}());
+});
 
 Promise.all([
     new Promise((resolve) => {
