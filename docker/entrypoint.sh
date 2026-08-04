@@ -79,7 +79,12 @@ else
     populate "teams"     pocket-grimoire:populate-teams    --file=assets/data/teams.json
     populate "editions"  pocket-grimoire:populate-editions --file=assets/data/editions.json
     populate "roles"     pocket-grimoire:populate-roles    --file=assets/data/characters.json
-    populate "jinxes"    pocket-grimoire:populate-jinxes   --file=assets/data/jinx.json
+    # pocket-grimoire:jinxes, NOT populate-jinxes. jinx.json is nested
+    # ({id, jinx:[{id, reason}]}) and only this command reads that shape; populate-jinxes
+    # wants a flat {target, trick, reason}, so on jinx.json every target is null and it
+    # dies in JinxRepository::getByTargetTrick(). Jinxes also have to come after roles,
+    # since each one links two of them.
+    populate "jinxes"    pocket-grimoire:jinxes            --file=assets/data/jinx.json
     populate "night order" pocket-grimoire:order-roles     --file=assets/data/night-order.json
 
     roles="$(php bin/console dbal:run-sql 'SELECT COUNT(*) AS c FROM roles' --no-interaction 2>/dev/null | grep -oE '[0-9]+' | tail -1 || echo '?')"
