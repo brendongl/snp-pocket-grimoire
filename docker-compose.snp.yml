@@ -36,6 +36,12 @@ services:
       DATABASE_URL: "mysql://${DB_USER:-grimoire}:${DB_PASSWORD:?set DB_PASSWORD in .env.snp}@database:3306/${DB_NAME:-grimoire}?serverVersion=8.0&charset=utf8mb4"
       # Flip to 1 once the reference data is imported, to speed up restarts.
       PG_SKIP_IMPORT: ${PG_SKIP_IMPORT:-0}
+      # Sip n Play bridge. Only SnpController reads these — the key must never be
+      # rendered into the page, which gets passed around a table on a shared phone.
+      # Leave blank to disable the integration entirely; the grimoire works without it.
+      SNP_BRIDGE_URL: ${SNP_BRIDGE_URL:-}
+      SNP_BRIDGE_KEY: ${SNP_BRIDGE_KEY:-}
+      SNP_TIMEZONE: ${SNP_TIMEZONE:-Asia/Ho_Chi_Minh}
     ports:
       - "${PORT:-8088}:80"
 
