@@ -94,7 +94,29 @@ render — the tokens are just blank.
 > [!warning] This is a licensing decision, not a technical one
 > Sip n Play is a commercial venue. Copying TPI's artwork onto a cafe's own deployment is a
 > different question from a fan running it at home, and it should be answered deliberately
-> rather than by quietly downloading the files.
+> rather than by quietly downloading the files. **Sip n Play runs this with TPI's
+> permission and owns the physical game.**
+
+### Fetching them
+
+```bash
+bash docker/fetch-role-icons.sh
+docker compose -f docker-compose.snp.yml --env-file .env.snp up -d --build
+```
+
+Pulls `Icon_<id>.png` from the official wiki, converts to WebP and writes
+`assets/img/roles/<id>_<g|e>.webp` — the exact names the app's own `characters.json`
+asks for. Everything runs in a throwaway Alpine container, so Docker is the only
+dependency. Idempotent: files already present are skipped.
+
+Coverage is **180 of 181**; `bigwig` has no icon on the wiki.
+
+Only `/build/img/roles/` is fetched. The other 68 characters point at
+`/build/img/icons/<team>/`, which upstream **does** commit (247 files) — fetching those
+would overwrite shipped artwork.
+
+The icons stay gitignored here exactly as upstream leaves them, so re-run this after a
+fresh clone.
 
 ## Deploying
 
