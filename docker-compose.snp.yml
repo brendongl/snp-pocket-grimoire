@@ -42,6 +42,11 @@ services:
       SNP_BRIDGE_URL: ${SNP_BRIDGE_URL:-}
       SNP_BRIDGE_KEY: ${SNP_BRIDGE_KEY:-}
       SNP_TIMEZONE: ${SNP_TIMEZONE:-Asia/Ho_Chi_Minh}
+      # Gate entry behind a signed link from sipnplay.cafe. BLANK = no gate, which is
+      # correct for a LAN-only box and is what keeps the current deployment working.
+      # Set it (matching GRIMOIRE_TOKEN_SECRET in snp-site) before exposing this beyond
+      # the LAN — the app has no login of its own.
+      GRIMOIRE_TOKEN_SECRET: ${GRIMOIRE_TOKEN_SECRET:-}
     ports:
       - "${PORT:-8088}:80"
 
