@@ -49,14 +49,15 @@ docker run --rm \
         # What the app asks for, taken from its own data rather than guessed:
         #   "image": "/build/img/roles/acrobat_g.webp"  ->  acrobat<TAB>acrobat_g
         #
-        # ONLY /build/img/roles/. The other 68 characters point at
-        # /build/img/icons/<team>/, which upstream does ship in the repo — fetching
-        # those would overwrite committed artwork with wiki versions.
-        jq -r ".[]
-               | select(.image != null)
-               | select(.image | startswith(\"/build/img/roles/\"))
-               | [.id, (.image | split(\"/\") | last | rtrimstr(\".webp\"))]
-               | @tsv" assets/data/characters.json > /tmp/needed.tsv
+        # jq emits id + full path, and the grep keeps ONLY /build/img/roles/. The other
+        # 68 characters point at /build/img/icons/<team>/, which upstream does ship in
+        # the repo — writing those into roles/ would misfile them. Filtering in grep
+        # rather than inside jq keeps this readable through two layers of shell quoting,
+        # where an earlier in-jq select silently matched everything.
+        jq -r ".[] | select(.image != null) | [.id, .image] | @tsv" assets/data/characters.json \
+            | grep -F "/build/img/roles/" \
+            | awk -F"\t" "{ n = \$2; sub(/^.*\//, \"\", n); sub(/\.webp$/, \"\", n); print \$1 \"\t\" n }" \
+            > /tmp/needed.tsv
 
         needed=$(wc -l < /tmp/needed.tsv)
         echo "  app needs ${needed} icons"
