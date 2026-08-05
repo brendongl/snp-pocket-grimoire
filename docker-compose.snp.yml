@@ -95,7 +95,11 @@ services:
     profiles: ["tunnel"]
     depends_on:
       - app
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env.snp}
+    # Default-empty, NOT ${VAR:?...}. Compose interpolates every service at parse time
+    # regardless of profile, so a required variable here breaks `up`, `ps` and `config`
+    # for the LAN deployment that never wanted a tunnel. If it is empty, only this
+    # container fails, and only when the profile is actually requested.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
 
 volumes:
   grimoire-db:
