@@ -55,9 +55,14 @@ class SnpAccessListener implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            // Priority 8: after Symfony's router (32) has done its work but before the
-            // controller is resolved, so we can short-circuit cleanly.
-            KernelEvents::REQUEST => ['onRequest', 8],
+            // Priority 40 — ABOVE Symfony's RouterListener (32), deliberately.
+            //
+            // An access gate must not depend on routing. At a lower priority the router
+            // runs first and throws 404 for /snp/enter, which has no route of its own,
+            // so a perfectly valid token was rejected before this listener ever saw it.
+            // Running first also means an unauthenticated request to any path — routed
+            // or not — is refused rather than revealing which paths exist.
+            KernelEvents::REQUEST => ['onRequest', 40],
             KernelEvents::RESPONSE => ['onResponse', 0],
         ];
     }
