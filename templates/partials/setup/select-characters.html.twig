@@ -143,24 +143,41 @@
         <div id="character-decision-wrapper" class="mb-4"></div>
         <p id="character-decision-ability"></p>
         {#
-            [snp] Tonight's sign-ups, as tappable chips.
+            [snp] Two ways to say who you are, and only one of them counts.
 
-            The <datalist> below does populate, but a datalist is invisible until you
-            start typing and is unreliable on mobile browsers — so on a phone being
-            passed around a table it may as well not exist. These are visible without
-            being asked for, and are one tap rather than typing a name correctly.
+            A <datalist> was tried first and was the wrong tool: invisible until you
+            type, unreliable on mobile, so on a phone going round a table the names were
+            there and nobody could find them.
 
-            Hidden until there is something to show, so a night with no online sign-ups
-            looks exactly as it did before.
+            1. Pick from the sign-up list — tap your name. This is the ONLY route that
+               produces a leaderboard entry, because it is the only one that identifies
+               an actual account rather than a string someone typed.
+            2. Name yourself — a label on the grimoire for the storyteller's benefit,
+               deliberately not tracked. Free-typed names were what split people across
+               two leaderboard identities in the first place.
+
+            Mutually exclusive: using one greys out the other, so nobody can half-fill
+            both and leave it ambiguous which they meant.
+
+            #player-name is kept (now hidden) because select-your-character.js reads its
+            .value when the dialog closes — that is upstream's contract and this drives
+            it rather than replacing it.
         #}
         <div id="snp-signups" class="mb-4" hidden>
-            <p class="text-small" style="margin:0 0 .35rem">Signed up tonight — tap to fill:</p>
+            <label class="d-block text-small" for="snp-signups-list">Pick your name from the sign-up list</label>
             <div id="snp-signups-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
         </div>
-        <p>
-            <label for="player-name" class="d-block text-small">{{ 'setup.character_decision.name'|trans }}</label>
-            <input type="text" class="input" name="player-name" id="player-name" list="player-name-options" autocomplete="off">
+
+        <p id="snp-walkin-wrap">
+            <label for="snp-walkin" class="d-block text-small">
+                Name yourself <strong>(no leaderboard entry tracked)</strong>
+            </label>
+            <input type="text" class="input" id="snp-walkin" autocomplete="off">
         </p>
+
+        {# Upstream's field. Hidden, and set from whichever control above is in use. #}
+        <input type="hidden" name="player-name" id="player-name">
+        {# Kept because characters.js populates it; harmless now nothing points at it. #}
         <datalist id="player-name-options"></datalist>
         <p><button type="submit" class="button" data-dialog-hide>{{ 'setup.character_decision.return'|trans }}</button></p>
     </form>

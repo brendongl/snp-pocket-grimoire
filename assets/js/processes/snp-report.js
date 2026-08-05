@@ -81,18 +81,19 @@ if (wrapper) {
         }
 
         const linked = players.filter((player) => player.customerId).length;
-        const unnamed = players.filter((player) => !player.name).length;
+        const untracked = players.length - linked;
 
         const rows = players.map((player) => {
 
             const who = player.name
                 ? player.name
                 : "<em>no name</em>";
-            // Says plainly how each seat will be credited: to an account, to a typed
-            // name on the leaderboard, or to nobody at all.
+            // Says plainly how each seat will be credited. Only a name picked from the
+            // sign-up list is an account; anything typed is a label on the board and is
+            // deliberately not tracked, which is what the dialog promises.
             const credit = player.customerId
                 ? "account"
-                : (player.name ? "walk-in" : "not credited");
+                : "not tracked";
 
             return `<li>${who} — ${player.characterName} <span class="text-small">(${credit})</span></li>`;
 
@@ -101,7 +102,7 @@ if (wrapper) {
         preview.innerHTML = `
             <p class="text-small">
                 Reporting ${players.length} player${players.length === 1 ? "" : "s"} —
-                ${linked} linked to an account${unnamed ? `, ${unnamed} with no name` : ""}.
+                ${linked} on the leaderboard${untracked ? `, ${untracked} not tracked` : ""}.
             </p>
             <ul class="text-small">${rows}</ul>
         `;
@@ -156,7 +157,16 @@ if (wrapper) {
                 date: chosenDate(),
                 winningTeam: winner.value,
                 notes: notesField ? notesField.value : "",
-                players
+                // A typed name is sent as no name at all. The seat still counts towards
+                // the game — player numbers and character stays stay right — but it
+                // creates no leaderboard identity, which is what "no leaderboard entry
+                // tracked" promises the player, and is what stopped free-typed names
+                // splitting people across two identities.
+                players: players.map((player) => (
+                    player.customerId
+                        ? player
+                        : { ...player, name: "" }
+                ))
             })
         })
             .then((response) => response.json().then((data) => ({ ok: response.ok, data })))

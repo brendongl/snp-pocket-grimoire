@@ -68,11 +68,44 @@ loadTonight().then(({ players }) => {
 
     const wrapper = lookupOne("#snp-signups");
     const list = lookupOne("#snp-signups-list");
-    const input = lookupOne("#player-name");
+    const walkin = lookupOne("#snp-walkin");
+    // Upstream's field: select-your-character.js reads its .value when the dialog
+    // closes. Whichever control is in use writes here.
+    const hidden = lookupOne("#player-name");
 
-    if (!wrapper || !list || !input || players.length === 0) {
+    if (!walkin || !hidden) {
         return;
     }
+
+    const chips = [];
+    let picked = null;
+
+    const paint = () => {
+
+        chips.forEach((chip) => {
+
+            const isPicked = chip.dataset.name === picked;
+            chip.setAttribute("aria-pressed", isPicked ? "true" : "false");
+            chip.style.outline = isPicked ? "3px solid #2b6cb0" : "";
+            chip.style.fontWeight = isPicked ? "700" : "";
+            // Greyed once a name has been typed instead — not disabled, so tapping one
+            // is still how you change your mind.
+            chip.style.opacity = (!picked && walkin.value.trim()) ? ".4" : "1";
+
+        });
+
+        const lockWalkin = picked !== null;
+        walkin.disabled = lockWalkin;
+        walkin.style.opacity = lockWalkin ? ".4" : "1";
+        if (lockWalkin) {
+            walkin.value = "";
+        }
+
+        // Only a name picked from the sign-up list reaches the leaderboard. A typed one
+        // still labels the token on the board — it just is not an identity.
+        hidden.value = picked || walkin.value.trim();
+
+    };
 
     players.forEach(({ name }) => {
 
@@ -80,24 +113,41 @@ loadTonight().then(({ players }) => {
         chip.type = "button";
         chip.textContent = name;
         chip.className = "button";
-        // Sized down from the app's default button, which is built for full-width
-        // actions and would push three names off a phone screen.
+        chip.dataset.name = name;
+        // Narrower than the app's default button, which is built full-width and would
+        // push three names off a phone screen.
         chip.style.cssText = "padding:.3rem .7rem;font-size:.85rem;width:auto";
 
         chip.addEventListener("click", () => {
-            input.value = name;
-            // Upstream reads this input on submit; dispatching keeps anything else
-            // listening in step rather than relying on it only being read later.
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-            input.focus();
+            // Tapping the picked name again clears it, so a mis-tap is recoverable
+            // without hunting for a reset.
+            picked = (picked === name) ? null : name;
+            paint();
         });
 
+        chips.push(chip);
         list.appendChild(chip);
 
     });
 
-    wrapper.hidden = false;
+    if (players.length > 0 && wrapper) {
+        wrapper.hidden = false;
+    }
+
+    walkin.addEventListener("input", paint);
+
+    // The dialog is reused for every player, and upstream only resets its own field, so
+    // without this the next person inherits the last one's choice.
+    const dialog = lookupOne("#character-decision");
+    if (dialog) {
+        dialog.addEventListener("close", () => {
+            picked = null;
+            walkin.value = "";
+            paint();
+        });
+    }
+
+    paint();
 
 });
 
