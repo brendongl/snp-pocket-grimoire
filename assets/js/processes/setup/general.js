@@ -55,13 +55,49 @@ Names.create()
 // Suggestions, not a restriction: the input stays free text so walk-ins still work,
 // which matters because plenty of players at the cafe never sign up online.
 //
+// Rendered as visible chips as well as feeding the <datalist>. The datalist alone was
+// not enough: it stays invisible until you type and is unreliable on mobile, so on a
+// phone going round a table the names were there but nobody could find them.
+//
 // The list is shared with the end-of-game report (see snp/tonight.js), which needs the
 // same names to work out which players have accounts.
 loadTonight().then(({ players }) => {
 
     const names = Names.create();
-
     players.forEach(({ name }) => names.add(name));
+
+    const wrapper = lookupOne("#snp-signups");
+    const list = lookupOne("#snp-signups-list");
+    const input = lookupOne("#player-name");
+
+    if (!wrapper || !list || !input || players.length === 0) {
+        return;
+    }
+
+    players.forEach(({ name }) => {
+
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.textContent = name;
+        chip.className = "button";
+        // Sized down from the app's default button, which is built for full-width
+        // actions and would push three names off a phone screen.
+        chip.style.cssText = "padding:.3rem .7rem;font-size:.85rem;width:auto";
+
+        chip.addEventListener("click", () => {
+            input.value = name;
+            // Upstream reads this input on submit; dispatching keeps anything else
+            // listening in step rather than relying on it only being read later.
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            input.focus();
+        });
+
+        list.appendChild(chip);
+
+    });
+
+    wrapper.hidden = false;
 
 });
 

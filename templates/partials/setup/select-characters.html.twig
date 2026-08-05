@@ -142,9 +142,24 @@
     <form id="character-decision-form">
         <div id="character-decision-wrapper" class="mb-4"></div>
         <p id="character-decision-ability"></p>
+        {#
+            [snp] Tonight's sign-ups, as tappable chips.
+
+            The <datalist> below does populate, but a datalist is invisible until you
+            start typing and is unreliable on mobile browsers — so on a phone being
+            passed around a table it may as well not exist. These are visible without
+            being asked for, and are one tap rather than typing a name correctly.
+
+            Hidden until there is something to show, so a night with no online sign-ups
+            looks exactly as it did before.
+        #}
+        <div id="snp-signups" class="mb-4" hidden>
+            <p class="text-small" style="margin:0 0 .35rem">Signed up tonight — tap to fill:</p>
+            <div id="snp-signups-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+        </div>
         <p>
             <label for="player-name" class="d-block text-small">{{ 'setup.character_decision.name'|trans }}</label>
-            <input type="text" class="input" name="player-name" id="player-name" list="player-name-options">
+            <input type="text" class="input" name="player-name" id="player-name" list="player-name-options" autocomplete="off">
         </p>
         <datalist id="player-name-options"></datalist>
         <p><button type="submit" class="button" data-dialog-hide>{{ 'setup.character_decision.return'|trans }}</button></p>
