@@ -37,11 +37,6 @@ class SnpAccessListener implements EventSubscriberInterface
     private const COOKIE_NAME = 'snp_grimoire';
     private const ENTER_PATH = '/snp/enter';
 
-    /** Reachable without a token: health checks and the assets a 403 page needs. */
-    private const ALWAYS_ALLOWED = [
-        '/snp/enter',
-    ];
-
     private $secret;
 
     /** @var Cookie|null Set during the request, attached on the response. */
