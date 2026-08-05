@@ -104,7 +104,7 @@ class SnpAccessListener implements EventSubscriberInterface
                 ->withExpires(time() + $lifetime)
                 ->withPath('/')
                 ->withHttpOnly(true)
-                ->withSecure($request->isSecure())
+                ->withSecure($this->isSecureRequest($request))
                 ->withSameSite(Cookie::SAMESITE_LAX);
 
             // Carry ?date= through so the board loads the right night's sign-ups, and
@@ -130,6 +130,32 @@ class SnpAccessListener implements EventSubscriberInterface
             $event->getResponse()->headers->setCookie($this->issue);
             $this->issue = null;
         }
+    }
+
+    /**
+     * Did this request reach the *user* over HTTPS?
+     *
+     * `$request->isSecure()` alone says no behind the Cloudflare tunnel: cloudflared
+     * terminates TLS at the edge and speaks plain HTTP to this container, so the entry
+     * cookie was being issued without the Secure flag even though the browser was on
+     * https. That is a cookie that a downgrade could put on the wire.
+     *
+     * X-Forwarded-Proto comes from cloudflared, which is the only thing that reaches us
+     * that way; a LAN client on plain http sets no such header and correctly gets a
+     * non-Secure cookie, which it needs, since a Secure cookie would never be sent back
+     * over http://192.168.50.110:8088.
+     *
+     * Read directly rather than via trusted_proxies, so this stays a local decision
+     * about one cookie instead of changing how the whole framework treats forwarded
+     * headers.
+     */
+    private function isSecureRequest($request): bool
+    {
+        if ($request->isSecure()) {
+            return true;
+        }
+
+        return strtolower((string) $request->headers->get('x-forwarded-proto', '')) === 'https';
     }
 
     /**
