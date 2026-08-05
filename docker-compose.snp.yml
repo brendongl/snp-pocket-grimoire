@@ -72,5 +72,30 @@ services:
       retries: 12
       start_period: 40s
 
+  # Optional: expose the grimoire at grimoire.sipnplay.cafe.
+  #
+  #   docker compose -f docker-compose.snp.yml --env-file .env.snp --profile tunnel up -d
+  #
+  # Only starts when the tunnel profile is asked for, so the default LAN-only deployment
+  # is unchanged. A dashboard-managed tunnel (token from Cloudflare Zero Trust ->
+  # Networks -> Tunnels) rather than `cloudflared tunnel login`, which needs a browser
+  # and root on this box.
+  #
+  # Point the tunnel's public hostname at  http://app:80  — it shares this compose
+  # network, so nothing extra has to be published to the host.
+  #
+  # > There is NO Cloudflare Access policy in front of this. The grimoire's own gate
+  # > (GRIMOIRE_TOKEN_SECRET + signed links from sipnplay.cafe) is the only thing
+  # > standing between the public internet and every player's character. Do not run the
+  # > tunnel with that secret unset.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: snp-pocket-grimoire-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env.snp}
+
 volumes:
   grimoire-db:
