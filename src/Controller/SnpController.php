@@ -147,6 +147,9 @@ class SnpController extends AbstractController
             ], 503);
         }
 
+        if (strlen($request->getContent()) > 5854552) {
+            return $this->json(['ok' => false, 'error' => 'Report is too large.'], 413);
+        }
         $body = json_decode($request->getContent(), true);
         if (!is_array($body)) {
             return $this->json(['ok' => false, 'error' => 'Malformed request.'], 400);
@@ -199,6 +202,13 @@ class SnpController extends AbstractController
             'winningTeam' => $winningTeam,
             'players' => $players,
         ];
+        if (isset($body['grimoireImage'])) {
+            if (!is_string($body['grimoireImage']) || strlen($body['grimoireImage']) > 5592430 ||
+                !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/]+={0,2}$/D', $body['grimoireImage'])) {
+                return $this->json(['ok' => false, 'error' => 'Picture must be a PNG under 4 MB.'], 400);
+            }
+            $payload['grimoireImage'] = $body['grimoireImage'];
+        }
         if (!empty($body['scriptName'])) {
             $payload['scriptName'] = (string) $body['scriptName'];
         }

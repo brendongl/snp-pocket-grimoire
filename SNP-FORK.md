@@ -161,3 +161,24 @@ Not yet built:
 
 Both talk to snp-site over an API key. Upstream has no concept of a game ending or a
 winner, so (2) is genuinely new UI rather than a hook into something existing.
+
+## Final-board report picture
+
+`assets/js/snp/snapshot.js` uses pinned `html-to-image` to capture the full pad
+(characters, reminders, shrouds and player names). End Game & Report previews the
+PNG and warns that it will be public with the finished game. Board changes
+invalidate the preview; an explicit checkbox permits reporting without a picture.
+The PHP bridge forwards `grimoireImage` with the report, keeping its API key private.
+
+Deploy snp-site's nullable `grimoire_image_hash` migration and image-capable bridge
+before this fork. The site validates/re-encodes PNGs and stores them on its persistent
+volume; the browser never uploads SVG or arbitrary image URLs.
+
+Capture regression checks must inspect the image: computed implicit CSS grid tracks
+and auto margins otherwise displace token overlays and night-order numbers. The
+snapshot helper fixes these only in the captured copy. `regenerator-runtime` is
+imported explicitly for Encore's async transpilation.
+
+Run `php tools/test-snp-snapshot.php` for the isolated PHP proxy contract test.
+The corresponding snp-site browser test drives this fork locally, intercepts report
+requests and compares the preview pixels with the live pad in Chromium/WebKit.

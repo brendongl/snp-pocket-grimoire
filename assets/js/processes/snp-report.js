@@ -1,3 +1,4 @@
+import { capturePad } from "../snp/snapshot.js";
 /**
  * [snp] End of game — report the result to the Sip n Play leaderboard.
  *
@@ -30,6 +31,91 @@ if (wrapper) {
     const details = lookupOne("#snp-report");
 
     let sending = false;
+    let capturing = false;
+    let snapshot = null;
+    let snapshotState = "";
+    const picture = lookupOne("#snp-report-picture");
+    const pictureStatus = lookupOne("#snp-report-picture-status");
+    const refresh = lookupOne("#snp-report-refresh");
+    const omit = lookupOne("#snp-report-omit-picture");
+    const boardState = () => {
+        const pad = lookupOneCached(".js--pad");
+        return JSON.stringify([pad.innerHTML, pad.offsetWidth, pad.offsetHeight, document.documentElement.getAttribute("style"), document.body.className, collectPlayers()]);
+    };
+    const updateButton = () => {
+        button.disabled = sending || capturing || !collectPlayers().length ||
+            !wrapper.querySelector("input[name=snp-winner]:checked") ||
+            (!omit.checked && (!snapshot || snapshotState !== boardState()));
+    };
+    const invalidate = () => {
+        if (snapshot && snapshotState !== boardState()) {
+            snapshot = null;
+            picture.hidden = true;
+            picture.removeAttribute("src");
+            pictureStatus.textContent = "The board changed. Refresh the picture before reporting.";
+        }
+        updateButton();
+    };
+    const capture = async () => {
+        if (capturing || sending) return;
+        capturing = true;
+        snapshot = null;
+        picture.hidden = true;
+        refresh.disabled = true;
+        pictureStatus.textContent = "Taking a picture of the final board…";
+        updateButton();
+        try {
+            await loadTonight();
+            // The pad lives in a collapsible section; hidden pads have no layout.
+            const boardSection = lookupOneCached(".js--pad").closest("details");
+            if (boardSection && !boardSection.open) {
+                boardSection.open = true;
+                await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            }
+            const state = boardState();
+            let timer;
+            let image;
+            try {
+                image = await Promise.race([
+                    capturePad(lookupOneCached(".js--pad")),
+                    new Promise((_, reject) => {
+                        timer = setTimeout(() => reject(new Error("Picture timed out. Try again or report without a picture.")), 20000);
+                    })
+                ]);
+            } finally {
+                clearTimeout(timer);
+            }
+            if (state !== boardState()) throw new Error("The board changed. Refresh the picture again.");
+            snapshot = image;
+            snapshotState = state;
+            picture.src = image;
+            picture.hidden = omit.checked;
+            pictureStatus.textContent = "Check the seats, characters, reminders and shrouds before reporting.";
+        } catch (error) {
+            pictureStatus.textContent = error.message || "Could not capture the board. Try again or report without a picture.";
+        } finally {
+            capturing = false;
+            refresh.disabled = false;
+            drawPreview();
+        }
+    };
+    refresh.addEventListener("click", capture);
+    omit.addEventListener("change", () => {
+        picture.hidden = omit.checked || !snapshot;
+        updateButton();
+    });
+    const padElement = lookupOneCached(".js--pad");
+    if (padElement) {
+        new MutationObserver(invalidate).observe(padElement, { subtree: true, childList: true, attributes: true, characterData: true });
+        new ResizeObserver(invalidate).observe(padElement);
+    }
+    new MutationObserver(invalidate).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+    new MutationObserver(invalidate).observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
+    const escapeText = (value) => {
+        const span = document.createElement("span");
+        span.textContent = value;
+        return span.innerHTML;
+    };
 
     const setStatus = (message, kind) => {
         status.textContent = message || "";
@@ -86,7 +172,7 @@ if (wrapper) {
         const rows = players.map((player) => {
 
             const who = player.name
-                ? player.name
+                ? escapeText(player.name)
                 : "<em>no name</em>";
             // Says plainly how each seat will be credited. Only a name picked from the
             // sign-up list is an account; anything typed is a label on the board and is
@@ -95,7 +181,7 @@ if (wrapper) {
                 ? "account"
                 : "not tracked";
 
-            return `<li>${who} — ${player.characterName} <span class="text-small">(${credit})</span></li>`;
+            return `<li>${who} — ${escapeText(player.characterName)} <span class="text-small">(${credit})</span></li>`;
 
         }).join("");
 
@@ -107,8 +193,7 @@ if (wrapper) {
             <ul class="text-small">${rows}</ul>
         `;
 
-        const winner = wrapper.querySelector("input[name=snp-winner]:checked");
-        button.disabled = sending || !winner;
+        updateButton();
 
         return players;
 
@@ -128,7 +213,8 @@ if (wrapper) {
 
         const winner = wrapper.querySelector("input[name=snp-winner]:checked");
 
-        if (!winner || sending) {
+        invalidate();
+        if (!winner || sending || button.disabled) {
             return;
         }
 
@@ -154,6 +240,7 @@ if (wrapper) {
                 Accept: "application/json"
             },
             body: JSON.stringify({
+                grimoireImage: omit.checked ? null : snapshot,
                 date: chosenDate(),
                 winningTeam: winner.value,
                 notes: notesField ? notesField.value : "",
@@ -202,7 +289,7 @@ if (wrapper) {
     wrapper.addEventListener("change", ({ target }) => {
 
         if (target.name === "snp-winner") {
-            button.disabled = sending;
+            updateButton();
         }
 
     });
@@ -217,6 +304,7 @@ if (wrapper) {
 
             if (details.open) {
                 drawPreview();
+                if (!omit.checked) capture();
             }
 
         });

@@ -19,5 +19,7 @@
         "watch": "encore dev --watch",
         "build": "encore production --progress"
     },
-    "dependencies": {}
+    "dependencies": {
+        "html-to-image": "1.11.13"
+    }
 }

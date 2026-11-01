@@ -38,6 +38,13 @@
 
         {# Shows exactly what is about to be sent, so a wrong seat is caught before the
            write rather than after it. #}
+        <div class="mb-4">
+            <p class="text-small">Final board picture — saved with this game on the public leaderboard, including any names and reminder tokens visible here.</p>
+            <img id="snp-report-picture" alt="Final grimoire with character seats, reminder tokens and death shrouds" hidden style="max-width:100%;height:auto;">
+            <p id="snp-report-picture-status" class="text-small" role="status" aria-live="polite"></p>
+            <button type="button" class="button" id="snp-report-refresh">Refresh picture</button>
+            <p class="text-small"><label><input type="checkbox" id="snp-report-omit-picture" data-no-store> Report without a picture</label></p>
+        </div>
         <div id="snp-report-preview" class="mb-4"></div>
 
         <p>
